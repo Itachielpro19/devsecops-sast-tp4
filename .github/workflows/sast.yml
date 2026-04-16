@@ -18,7 +18,14 @@ jobs:
       - name: Run Bandit
         run: bandit -r . -f json -o bandit.json -ll || true
       - name: Show results
-        run: cat bandit.json | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'Issues found - {len(d[\"results\"])}'); [print(f'  {r[\"test_id\"]}: {r[\"issue_text\"][:60]} (Line {r[\"line_number\"]})') for r in d['results']]"
+        run: |
+          python3 -c "
+          import json
+          d = json.load(open('bandit.json'))
+          print(f'Issues: {len(d.get(\"results\",[]))}')
+          for r in d.get('results',[]):
+              print(f'  {r[\"test_id\"]}: {r[\"issue_text\"][:60]}')
+          " || true
 
   semgrep:
     runs-on: ubuntu-latest
