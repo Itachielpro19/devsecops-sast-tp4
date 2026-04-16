@@ -1,0 +1,39 @@
+name: SAST Security Pipeline
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  bandit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Bandit
+        run: pip install bandit
+      - name: Run Bandit
+        run: bandit -r . -f json -o bandit.json -ll || true
+      - name: Show results
+        run: cat bandit.json | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'Issues found - {len(d[\"results\"])}'); [print(f'  {r[\"test_id\"]}: {r[\"issue_text\"][:60]} (Line {r[\"line_number\"]})') for r in d['results']]"
+
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: returntocorp/semgrep-action@v1
+        with:
+          config: p/security-audit p/owasp-top-ten p/python
+
+  security-gate:
+    runs-on: ubuntu-latest
+    needs: [bandit, semgrep]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Security gate check
+        run: |
+          pip install semgrep
+          semgrep --config=p/security-audit --error --severity=ERROR .
